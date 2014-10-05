@@ -1,0 +1,17 @@
+hw2 cs156
+
+1. pick a starting spot A in n-dimensions with n degrees of freedom:
+	T(1) = the first step,...,T(i) = the ith step
+	
+	scenario a (hill w/ restart): T(1) is chosen from the successors of A 
+		coming to A', with DeltaE(T(1)) < 0. The euclidean distance (minimum distance given complete relaxation) to the goal E of A' is "E(A')_a1". Restart. E(A')_a2 is the result of the second T(1).
+
+	scenario b (beam w/ 2 states): E(A')_b1, E(A')_b2 are the choices from T(1).
+
+	conclusion: Totalling two successors from scenario a and two from scenario b, we have chosen 
+		4 random successors. In scenario a, we have no choice on either E(A'). In scenario b, we chose the best. E(A')_b1 != E(A')_b2 (is not the same element of the state space, but they could be equivalent); E(A')_a1 == E(A')_a2 is possible. Therefore, even if 
+		E(A')_a1 == E(A')_b1, then only E(A')_b2 need be less than E(A')_a1 (and equivalently 
+		E(A')_a2). 
+
+2. If a queen is "stuck", meaning it can't pass a certain tile because there's always another queen 	attacking passing the threshold for the heuristic in every attemp to pass, then allowing MORE 		queens to attack than the current threshold would render the queen "unstuck".
+
