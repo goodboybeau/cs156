@@ -11,4 +11,31 @@ if __name__ == '__main__':
 	deck = Deck()
 	eights = CrazyEight(deck, 10, (fs + 1) % 2)
 	eights.ready()
-	eights.play()
+
+	def play(CE):
+		count = 1
+		while not CE._game_over:
+			print "------------------------------------------------"
+			print "history:\t",CE.history
+			print "Faceup card:\t||%d||" % CE.current_face_up,"(%d,%d)" % (CE.current_face_val(),CARD_SUIT(CE.current_face_up))
+			print "%d:\t\t"%CE.me,CE.my_hand
+			print "\t\t",str([(x%13,int(math.floor(x/13))) for x in CE.my_hand])
+			print "%d:\t\t" % ((CE.me + 1) % 2),CE.their_hand
+			print "\t\t",str([(x%13,int(math.floor(x/13))) for x in CE.their_hand])
+			move = CE.next()
+			if not (move is None):
+				print "move #%d: %s" %(count, str(move))
+				CE.history.append(move)
+				count += 1
+
+		winner, loser = None, None
+		if CE.win():
+			winner, loser = "I", "You"
+		elif CE.lose():
+			winner, loser = "You", "I"
+		else:
+			raise Exception("Game over and nobody won!")
+
+		print "%s win! %s lose! %s get %d points! Write it down!" % (winner, loser, winner, sum(CE.their_hand))
+
+	play(eights)

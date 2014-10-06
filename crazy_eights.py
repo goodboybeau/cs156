@@ -26,10 +26,6 @@
 
 #3.
 
-# state = (deck, their_hand, partial_state)
-# partial_state = (face_up_card, suit, my_hand, history)
-# move = (player_num, face_up_card, suit, number_of_cards)
-
 import random, math
 
 class Deck(object):
@@ -47,10 +43,7 @@ class Deck(object):
 
 	#add this to hand
 	def deal_one(self):
-		try:
-			return [self.deck.pop(0)]
-		except IndexError:
-			return None
+		return self.deck.pop(0)
 
 	#add this to hand
 	def deal_many(self, count):
@@ -59,12 +52,12 @@ class Deck(object):
 
 		dealt = []
 
-		if not self.deck.size():
+		if not len(self.deck):
 			return None
 
 		try:
 			for x in range(count):
-				dealt += self.deal_one()
+				dealt.append(self.deal_one())
 		except IndexError:
 			pass
 		except TypeError:
@@ -72,8 +65,8 @@ class Deck(object):
 		finally:
 			return dealt
 		
-	def size(self):
-		return self.deck.size()
+	def count(self):
+		return self.deck.count()
 
 def CARD_VAL(c):
 	return c % 13
@@ -103,18 +96,19 @@ class CrazyEight(object):
 		self._game_over = False
 		self.turn = 0
 		self.twos = 0
-		self.last_player = None
+		self.last_player = 0
 
 	def ready(self):
 		self.deck.shuffle()
 		for x in range(8):
-			self.my_hand += self.deck.deal_one()
-			self.their_hand += self.deck.deal_one()
+			self.my_hand.append(self.deck.deal_one())
+			self.their_hand.append(self.deck.deal_one())
 		self.current_face_up = self.deck.deal_one()
-		
-		print "My hand",str(self.my_hand)
-		print "Their hand",str(self.their_hand)
-		print "Me:",self.me
+		initial = (None, self.current_face_val(), self.current_face_suit(), 0)
+		self.history.append(initial)
+
+		print self.me,str(self.my_hand)
+		print (self.me + 1) % 2,str(self.their_hand)
 
 	def game_over(self):
 		return self._game_over
@@ -127,7 +121,7 @@ class CrazyEight(object):
 		return CARD_VAL(self.current_face_up)
 
 	def current_face_suit(self):
-		return CARD_SUIT(self.current_face_up)
+		return self.declared_suit if self.declared_suit is not None else CARD_SUIT(self.current_face_up)
 
 	def card_is_jack(self, card):
 		return CARD_VAL(card) == 10
@@ -147,12 +141,63 @@ class CrazyEight(object):
 	def hand_has_val(self, hand, val):
 		return val in [CARD_VAL(x) for x in hand]
 
-	def hand_can_play_current(self, hand):
-		return 	self.hand_has_val(hand, None if ( self.card_is_eight(self.current_face_up) and not self.turn_is(self.last_player) ) else self.current_face_val()) or \
-				self.hand_has_suit(hand, CARD_SUIT(self.declared_suit or self.current_face_up))
+	def hand_can_play_current(self, hand, current=None,suit=None):
+		c = current is not None
+		s = suit is not None
 
-	def can_play_card(self,card):
-		return CARD_SUIT(card) == self.current_face_suit() or CARD_VAL(card) == self.current_face_val()
+		if c:
+			temp = self.current_face_up
+			self.current_face_up = current
+			current = temp
+
+		if s:
+			temp = self.declared_suit
+			self.declared_suit = suit
+			suit = temp
+
+		result = self.hand_has_val(hand, None if self.declared_suit else self.current_face_val()) or \
+				 self.hand_has_suit(hand, self.declared_suit or self.current_face_suit())
+		
+		if c:
+			temp = self.current_face_up
+			self.current_face_up = current
+			current = temp
+
+		if s:
+			temp = self.declared_suit
+			self.declared_suit = suit
+			suit = temp
+
+		return result
+
+	def can_play_card(self,card,current=None, suit=None):
+		c = current is not None
+		s = suit is not None
+
+		if c:
+			temp = self.current_face_up
+			self.current_face_up = current
+			current = temp
+
+		if s:
+			temp = self.declared_suit
+			self.declared_suit = suit
+			suit = temp
+
+		result = CARD_SUIT(card) == (self.current_face_suit()) or \
+			CARD_VAL(card) ==  self.current_face_val()
+
+		if c:
+			temp = self.current_face_up
+			self.current_face_up = current
+			current = temp
+
+		if s:
+			temp = self.declared_suit
+			self.declared_suit = suit
+			suit = temp
+
+		return result
 
 	def turn_is(self, t):
 		return t == self.turn
@@ -169,129 +214,20 @@ class CrazyEight(object):
 		print "SUIT DECLARED",self.declared_suit
 
 	def depth_of_next_playable(self):
-		for x in range(self.deck.size()):
+		for x in range(self.deck.count()):
 			if self.can_play_card(self.deck.deck[x]):
 				return x
 		return None
 
+	def playable_cards(self, hand, face_up_card, suit=None):
+		playables = []
+		for c in hand:
+			if self.can_play_card(c,current=face_up_card,suit=suit):
+				playables.append(c)
+
+		return playables
+
 	############## End: New Methods
-
-	def must_pick_up(self, turn):
-		hand = self.get_current_hand()
-
-		if self.card_is_jack(self.current_face_up) and not (turn == self.last_player):
-			return False, None
-
-		if self.card_is_queen_of_spades(self.current_face_up) and not (turn == self.last_player):
-			return True, 5
-
-		elif self.card_is_two(self.current_face_up) and not self.turn_is(self.last_player):
-			if not self.hand_has_val(hand,1):
-				ret = True, self.twos
-				self.twos = 0
-				return ret
-			else:
-				return False, None
-
-		elif self.card_is_eight(self.current_face_up) and not self.turn_is(self.last_player):
-			if self.hand_has_val(hand, 7) or self.hand_has_suit(hand, self.current_face_suit()):
-				return False, None
-			else:
-				return True, 1
-
-		else:
-			if self.hand_has_val(hand, self.current_face_val()) or self.hand_has_suit(hand, self.declared_suit or self.current_face_suit()):
-				return False, None
-			else:
-				return True, 1
-
-		raise Exception("Didn't mean this...")
-
-
-	def can_play(self, turn):
-		must, count = self.must_pick_up(turn)
-		print turn,"must pick up:",must
-		if must:
-			return False, count
-		else:
-			return True, None
-
-
-	def next(self):
-		print "current val:\t",self.current_face_val()
-		print "current suit:\t", self.declared_suit or self.current_face_suit()
-
-		if not self.hand_can_play_current(self.get_current_hand()):
-
-
-		can_play, pick_up_count = self.can_play(self.turn)
-
-		card_val, card_suit = 0, 0
-
-		if not can_play:
-			print self.turn,"can't play",not can_play,", must pick up",pick_up_count
-			if pick_up_count is None:
-				#only jacks should produce this...
-				self.last_player = self.turn
-				self.turn = (self.turn + 1) % 2
-				return None
-			#just couldn't play a card so loop until you find one
-			elif pick_up_count == 1:
-				self.pick_up_cards(1)
-				while not self.can_play(player)[0]:
-					self.pick_up_cards(1)
-					pick_up_count += 1
-
-			#otherwise you pick up many and lose your turn 
-			else:
-				self.pick_up_cards(pick_up_count)
-				self.last_player = self.turn
-				self.turn = (self.turn + 1) % 2
-				return (player, card_val, card_suit, pick_up_count)
-
-		else:
-			player = self.turn
-
-		#if it's my turn, pick a move and do it
-		if self.turn_is(self.me):
-			my_move = self.pick_move()
-			card_val, card_suit = self.do_move(my_move,self.my_hand)
-		#otherwise, ask them
-		else:
-			their_move = self.get_their_move()
-			card_val, card_suit = self.do_move(their_move, self.their_hand)
-
-		self.last_player = self.turn
-		self.turn = (self.turn + 1) % 2
-		return (player, card_val, card_suit, pick_up_count or 0)
-
-	def pick_up_cards(self, count):
-		hand = self.get_current_hand()
-		add = self.deck.deal_many(count)
-		for c in add:
-			print "%d picked up %d (%d,%d): " %(self.turn,c,CARD_VAL(c),CARD_SUIT(c))
-		hand += add
-
-	def do_move(self, card_idx, hand):
-		self.current_face_up = hand.pop(card_idx)
-
-		#change suit if necessary
-		self.declared_suit = self.get_suit_declaration() if self.card_is_eight(self.current_face_up) else None
-
-		if self.card_is_two(self.current_face_up):
-			self.twos += 2
-
-		return self.current_face_val(), self.current_face_suit()
-
-	def pick_move(self):
-		#print "picking move"
-		card_val, card_suit = 52, 52
-		while not(card_val == self.current_face_val()) and not(card_suit == self.current_face_suit()):
-			idx = random.randint(0,len(self.my_hand)-1)
-			card_val = self.my_hand[idx] % 13
-			card_suit = int(math.floor(self.my_hand[idx]/13))
-		return idx
-
 
 	def pick_suit(self):
 		return random.randint(0,3)
@@ -327,32 +263,199 @@ class CrazyEight(object):
 		print "they picked",idx
 		return idx
 
-	def move(self, (face_up_card, suit, my_hand, history)):
-		for x in range(self.trials):
-			m = movePerfectKnowledge(self.deck, self.their_hand, (face_up_card, suit, self.my_hand, self.history), self.max_depth(), True)
-			self.stats[m] = self.stats[m] + 1 if m in self.stats.keys() else 0
+	def pick_up_cards(self, count):
+		hand = self.get_current_hand()
+		add = self.deck.deal_many(count)
+		for c in add:
+			print "%d picked up %d (%d,%d): " %(self.turn,c,CARD_VAL(c),CARD_SUIT(c))
+		hand += add
 
-		m = self.stats.keys()[0]
-		for k in self.stats:
-			if self.stats[k] > self.stats[m]:
-				m = k
+	def must_pick_up(self, turn):
+		hand = self.get_current_hand()
 
-		return self.stats[m]
+		if self.card_is_queen_of_spades(self.current_face_up) and not (turn == self.last_player):
+			return True, 5
 
-	def movePerfectKnowledge(self, (deck, their_hand, partial_state)):
-		if self.win():
-			self._game_over = True
-			return (self.me,0,0,0)
+		elif self.card_is_two(self.current_face_up) and not self.turn_is(self.last_player):
+			if not self.hand_has_val(hand,1):
+				return True, self.twos
+			else:
+				return False, None
 
-		if self.lose():
-			self._game_over = True
-			return (self.them,0,0,0)
+		elif self.card_is_eight(self.current_face_up) and not self.turn_is(self.last_player):
+			if self.hand_has_val(hand, 7) or self.hand_has_suit(hand, self.current_face_suit()):
+				return False, None
+			else:
+				return True, 1
 
-		outcomes = []
-		hand = partial_state[2]
-		for x in range(hand):
-			outcomes.push(self.mini_max(list(hand), list(their_hand), deck, self.max_depth(), True))
+		else:
+			if self.hand_has_val(hand, self.current_face_val()) or self.hand_has_suit(hand, self.declared_suit or self.current_face_suit()):
+				return False, None
+			else:
+				return True, 1
 
+		raise Exception("Didn't mean this...")
+
+
+	def can_play(self, turn):
+		if self.card_is_jack(self.current_face_up) and not (turn == self.last_player):
+			return False, None
+
+		must, count = self.must_pick_up(turn)
+		print turn,"must pick up:",must
+		if must:
+			return False, count
+		else:
+			return True, None
+
+
+	def next(self):
+		can_play, pick_up_count = self.can_play(self.turn)
+		print self.turn,"can't play",not can_play,", must pick up",pick_up_count
+
+		card_val, card_suit = 0, 0
+
+		if can_play:
+			#if it's my turn, pick a move and do it
+			if self.turn_is(self.me):
+				my_move = self.pick_move()
+				card_val, card_suit = self.do_move(my_move,self.my_hand)
+			#otherwise, ask them
+			else:
+				their_move = self.get_their_move()
+				card_val, card_suit = self.do_move(their_move, self.their_hand)
+
+		else:
+			self.declared_suit = None
+			#only jacks should produce this...
+			if pick_up_count is None:
+				#self.last_player = self.turn
+				self.turn = (self.turn + 1) % 2
+				return None
+			#just couldn't play a card so loop until you find one
+			elif pick_up_count == 1:
+				self.pick_up_cards(1)
+				while not self.can_play(self.turn)[0]:
+					self.pick_up_cards(1)
+					pick_up_count += 1
+					#if it's my turn, pick a move and do it
+				print "%d,%s" % (self.turn, str(self.get_current_hand()))
+				if self.turn_is(self.me):
+					my_move = self.pick_move()
+					card_val, card_suit = self.do_move(my_move,self.my_hand)
+				#otherwise, ask them
+				else:
+					their_move = self.get_their_move()
+					card_val, card_suit = self.do_move(their_move, self.their_hand)
+
+			#otherwise you pick up many and lose your turn 
+			else:
+				self.pick_up_cards(pick_up_count)
+				if pick_up_count % 2 == 0:
+					self.twos = 0
+					player = self.turn
+					self.turn = (self.turn + 1) % 2
+					return (player, 0, 0, pick_up_count)
+
+		self.last_player = self.turn
+		self.turn = (self.turn + 1) % 2
+		return (self.last_player, card_val, card_suit, pick_up_count or 0)
+
+
+	def do_move(self, card_idx, hand):
+		self.current_face_up = hand.pop(card_idx)
+
+		#change suit if necessary
+		if self.card_is_eight(self.current_face_up):
+			self.get_suit_declaration()
+		if self.card_is_two(self.current_face_up):
+			self.twos += 2
+
+		return self.current_face_val(), self.current_face_suit()
+
+	def pick_move(self):
+		print "picking move"
+		
+		partial_state = (self.current_face_up, self.current_face_suit(), self.my_hand, self.history)
+		return self.move(partial_state)
+
+		playable = lambda x : None
+		if self.card_is_two(self.current_face_up) and self.turn_is(self.turn):
+			playable = self.card_is_two
+		else:
+			playable = self.can_play_card
+
+		for x in range(len(self.my_hand)):
+			if playable(self.my_hand[x]):
+				return x
+		return None
+
+	#state = (deck, other_hand, (face_up_card, suit, player_hand, history))
+	def move(self, (face_up_card, suit, myhand, history)):
+		cards_left = list( set([x for x in range(52)]).difference(set(myhand).union(set([ ((f+1)*(s+1) - 1) for p,f,s,c in history])) ))
+		outcomes = {}
+		for x in range(100):
+			idx = random.randint(0,len(myhand)-1)
+			theirhand = []
+			for x in range(len(self.their_hand)):
+				if len(cards_left):
+					theirhand.append(cards_left.pop(0 if len(cards_left) == 1 else random.randint(0,len(cards_left)-1)))
+			state = (cards_left, theirhand,(face_up_card, suit, myhand, history))
+			value = self.movePerfectKnowledge(state)
+			outcomes[idx] = outcomes[idx] + value if idx in outcomes else value
+
+		k,v = 0,0
+		for key, val in outcomes.iteritems():
+			if val > v:
+				k = key
+
+		return k
+
+	def movePerfectKnowledge(self, (deck, theirhand, (face_up_card, suit, myhand, history))):
+		puc = 0 #number of cards to pick up...
+		while not self.hand_can_play_current(myhand,current=face_up_card, suit=suit):
+			puc += 1
+			myhand.append(deck.pop(0))
+		
+		value = self.alpha_beta(deck, theirhand, face_up_card, suit, myhand, -(float('inf')),(float('inf')),True,self.max_depth())
+
+		return value
+
+	def alpha_beta(self, deck, my_hand, face_up_card, suit, their_hand, a, b, _max,depth ):
+		if depth == 0 \
+			or ( len(my_hand if _max else their_hand) == 0 and len(deck) == 0 ):
+			#print "!!returning!!"
+			return sum([CARD_VAL(x) for x in their_hand]) - sum([CARD_VAL(x) for x in my_hand])
+		
+		if _max:
+			try:
+				while not self.hand_can_play_current(my_hand,current=face_up_card, suit=suit):
+					my_hand.append(deck.pop(0))
+			except IndexError:
+				return sum([CARD_VAL(x) for x in my_hand])
+
+			for card in self.playable_cards(my_hand,face_up_card,suit):
+				myhand=list(my_hand)
+				myhand.remove(card)
+				a = max(a, self.alpha_beta(deck, their_hand,card, suit, myhand, a, b, False, depth-1))
+				if b <= a:
+					break
+			return a
+
+		else:
+			try:
+				while not self.hand_can_play_current(their_hand,current=face_up_card, suit=suit):
+					their_hand.append(deck.pop(0))
+			except IndexError:
+				return sum([CARD_VAL(x) for x in their_hand])
+
+			for card in self.playable_cards(their_hand,face_up_card,suit):
+				theirhand=list(their_hand)
+				theirhand.remove(card)
+				b = min(b, self.alpha_beta(deck, theirhand,card, suit, my_hand, a, b, True, depth-1))
+				if b <= a:
+					break
+				return b
 
 	def win(self):
 		if len(self.my_hand):# + len(self.deck) == 0:
@@ -363,73 +466,6 @@ class CrazyEight(object):
 		if len(self.their_hand):# + len(self.deck) == 0:
 			return True
 		return False
-
-# state = (deck, their_hand, partial_state)
-# partial_state = (face_up_card, suit, my_hand, history)
-# move = (player_num, face_up_card, suit, number_of_cards)
-
-	def mini_max(self, myhand, their_hand, deck, depth, _max):
-
-		if depth == 0 or (len(myhand) == 0 and _max) or (len(their_hand) == 0 and not _max):
-			if _max:
-				return sum(myhand)
-			else:
-				return sum(state(1))
-
-		def max_value(best, val):
-			# here '<=' v. '<' matters
-			#if sum(best) <= sum(val):
-			if best <= val:
-				return val
-			return best
-
-		def min_value(best, val):
-			# here '>=' v. '>' matters
-			#if sum(best) >= sum(val):
-			if best >= val:
-				return val
-			return best
-
-		if _max:
-			#best = [-float('inf')]
-			best = -float('inf')
-			for x in myhand:
-				temp_hand = list(myhand).remove(x)
-				val = self.mini_max(temp_hand, their_hand, depth-1, not _max)
-				best = max_value(best, val)
-			return best
-		else:
-			#best = [float('inf')]
-			best = float('inf')
-			for x in their_hand:
-				temp_hand = list(their_hand).remove(x)
-				val = self.mini_max(myhand, temp_hand, state, depth-1, not _max)
-				best = min_value(best, val)
-
-	def play(self):
-		count = 1
-		while not self._game_over:
-			print "------------------------------------------------"
-			print "Faceup card:\t||%d||" % self.current_face_up,"(%d,%d)" % (self.current_face_val(),self.current_face_suit())
-			print "my_hand:\t",self.my_hand
-			print "\t\t",str([(x%13,int(math.floor(x/13))) for x in self.my_hand])
-			print "their_hand:\t",self.their_hand
-			print "\t\t",str([(x%13,int(math.floor(x/13))) for x in self.their_hand])
-			move = self.next()
-			if not (move is None):
-				print "move #%d: %s" %(count, str(move))
-				self.history.append(move)
-				count += 1
-
-		winner, loser = None, None
-		if self.win():
-			winner, loser = "I", "You"
-		elif self.lose():
-			winner, loser = "You", "I"
-		else:
-			raise Exception("Game over and nobody won!")
-
-		print "%s win! %s lose! %s get %d points! Write it down!" % (winner, loser, winner, sum(self.their_hand))
 
 if __name__ == '__main__':
 	print Deck().deck
