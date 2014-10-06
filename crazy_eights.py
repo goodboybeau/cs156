@@ -1,7 +1,7 @@
 '''
 @author			jaronhalt
 @sjsuid			007939971
-@descrption		hw2 cs156
+@descrption		hw2 cs156 run with Python2.7
 
 1. pick a starting spot A in n-dimensions with n degrees of freedom:
 	T(1) = the first step,...,T(i) = the ith step
@@ -421,6 +421,9 @@ class CrazyEight(object):
 
 		return value
 
+	'''
+	Alpha-beta algorithm via minimax
+	'''
 	def alpha_beta(self, deck, my_hand, face_up_card, suit, their_hand, a, b, _max,depth ):
 		if depth == 0 \
 			or ( len(my_hand if _max else their_hand) == 0 and len(deck) == 0 ):
