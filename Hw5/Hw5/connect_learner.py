@@ -20,7 +20,7 @@ function Decision-Tree-Learning(examples, attributes, parent_examples) returns a
 
 '''
 
-import sys, random
+import sys, random, time, datetime
 from math import log10, floor
 
 class Tree(object):
@@ -42,6 +42,7 @@ class Tree(object):
 		self.root = attr
 		self.branches = branches or []
 		self.parent_branch = parent_branch
+		self.last_traverse = ''
 
 	def add_branch(self, label, subtree):
 		self.branches.append( Tree.Branch(label, subtree) )
@@ -56,7 +57,10 @@ class Tree(object):
 		return self.get_str(0) 
 
 	def determine_connectedness(self, _map, indent=0):
-		print '\t'*indent, self.root
+		if indent == 0:
+			self.last_traverse = ''
+
+		self.last_traverse += ('\t'*indent) + self.root
 		v = _map.get_attr(self.root)
 		for b in self.branches:
 			if v == b.val:
@@ -115,13 +119,11 @@ def bucketize(val):
 	if val >= .7 and val <= 1:
 		return .9
 
-	print val
-
 	raise Exception
 
 class ExMap(list):
 
-	Attributes = ['count_ratio', 'lower_tri_ratio', 'upper_tri_ratio', 'diag_ratio']#, 'horizontal_change', 'vertical_change']
+	Attributes = [ 'horizontal_change', 'lower_tri_ratio', 'upper_tri_ratio', 'diag_ratio']
 
 	def __init__(self, entries):
 		self._connected = entries.pop(len(entries) - 1) if 'C' in entries[len(entries) - 1] else 'UNKNOWN'
@@ -142,27 +144,25 @@ class ExMap(list):
 			'upper_tri_ratio': self.attr_upper_ratio,
 			'diag_ratio': self.attr_diag_ratio,
 			'horizontal_change': self.attr_horizontal_change,
-			'vertical_change': self.attr_vertical_change
+			'attr_snake_horizontal': self.attr_snake_horizontal
 		}
 
 	def __str__(self):
 		s = ''
 		for x in self:
-			s += ' '.join(x) + '\n'
+			if 'C' not in x and 'U' not in x:
+				s += ' '.join(x) + '\n'
 		s += self._connected + '\n'
 
 		for k, v in self.attr_map.iteritems():
 			s += '%s:%f\n' % (k, v())
-		# s += 'count_ratio:%f\n' % self.attr_count_ratio()
-		# s += 'upper_ratio:%f\n' % self.attr_upper_ratio()
-		# s += 'lower_ratio:%f\n' % self.attr_lower_ratio()
-		# s += 'diag_ratio:%f\n' % self.attr_diag_ratio()
 		return s
 
 	def __repr__(self):
 		s = ''
 		for x in self:
-			s += ' '.join(x) + '\n'
+			if 'C' not in x and 'U' not in x:
+				s += ' '.join(x) + '\n'
 		s += self._connected + '\n'
 		return s
 
@@ -174,6 +174,31 @@ class ExMap(list):
 
 	def get(self, x, y):
 		return self.__getitem__(y)[x]
+
+	def is_occupied(self, x, y):
+		return self.get(x, y) == 'O'
+
+	def has_neighbor(self, x, y):
+		if self.get(x, y) is not 'O':
+			raise Exception("It don't matter if this fool has_neighbor!")
+
+		if x > 0:
+			if self.is_occupied(x-1, y):
+				return True
+
+		if x < 4:
+			if self.is_occupied(x+1, y):
+				return True
+
+		if y > 0:
+			if self.is_occupied(x, y-1):
+				return True
+
+		if y < 4:
+			if self.is_occupied(x, y+1):
+				return True
+
+		return False
 
 	def attr_count_ratio(self):
 		c = float(self._count) / float(25)
@@ -212,21 +237,26 @@ class ExMap(list):
 		c = float(c) / float(self._count)
 		return bucketize(c)
 
-	def attr_vertical_change(self):
+	def attr_snake_horizontal(self):
 		c = 0
 		s = 0
 		last = self.get(0,0)
-		for x in range(5):
-			for y in range(5):
-				if x == y == 0:
-					continue
-
-				n = self.get(x,y)
-				if not (last == n):
+		x, y = 1, 0
+		x_up = True
+		while y is not 5:
+			while not (x == 5 or x == -1):
+				n = self.get(x, y)
+				if not (n == last):
 					c += 1
 				else:
 					s += 1
-				last = n
+				x += 1 if x_up else -1
+			if x_up:
+				x = 4
+			else:
+				x = 0
+			x_up = not x_up
+			y += 1
 
 		c = float(c) / float(25)
 		return bucketize(1 - c)
@@ -329,12 +359,26 @@ def read_test_map(filename):
 	with open(filename, 'r') as f:
 		s = f.read().split('\n')
 		if len(s) > len(s[0]):
-			s.remove(len(s) - 1)
+			s.pop(len(s) - 1)
 
+		if len(s) < 5: return
 		m = ExMap( [l.split() for l in s ])
-		print m 
+		print m
 		return m
 
+
+random.seed(time.time() % 10)
+rand_map_entry = lambda : random.choice(['O', 'O', 'O',  'X'])
+
+def generate_random_map():
+	rows = []
+	for x in range(5):
+		cols = []
+		for y in range(5):
+			cols.append(rand_map_entry())
+		rows.append(cols)
+	rando_map = ExMap(rows)
+	return rando_map
 
 '''
 This creates a random grid.
@@ -345,19 +389,6 @@ it creates :count: random maps and writes each of them
 
 '''
 def make_training_set(filename, count):
-	random.seed(10)
-	rand_map_entry = lambda : random.choice(['O', 'O', 'O',  'X'])
-
-	def generate_random_map():
-		rows = []
-		for x in range(5):
-			cols = []
-			for y in range(5):
-				cols.append(rand_map_entry())
-			rows.append(cols)
-		rando_map = ExMap(rows)
-		return rando_map
-
 	with open(filename, 'w') as f:
 		for x in range(count):
 			m = generate_random_map()
@@ -366,18 +397,15 @@ def make_training_set(filename, count):
 
 if __name__ == '__main__':
 
-	for x in range(5):
-		for y in range(5):
-			ExMap.Attributes.append( (x,y) )
+	if len(sys.argv) < 3:
+		print "Usage: python connect_learner.py training_file_name.txt test_file_name.txt"
+		exit()
 
-	print ExMap.Attributes
+	T_FILENAME = sys.argv[1]
+	Q_FILENAME = sys.argv[2]
 
-	make_training_set('some',20000)
-	attributes = ExMap.Attributes
-
-	dtree = DecisionTreeLearning(read_examples('some'), attributes, [])
-	#print dtree
-	if dtree.determine_connectedness(read_test_map(sys.argv[2])):
-		print 'CONNECTED'
+	dtree = DecisionTreeLearning(read_examples(T_FILENAME), ExMap.Attributes, [])
+	if dtree.determine_connectedness(read_test_map(Q_FILENAME)):
+		print "CONNECTED"
 	else:
-		print 'DISCONNECTED'
+		print "DISCONNECTED"

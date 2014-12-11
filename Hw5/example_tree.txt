@@ -1,0 +1,39 @@
+root:lower_tri_ratio
+branch:
+	val:0.900000
+	subtree:
+		root:horizontal_change
+		branch:
+			val:0.600000
+			subtree:
+				root:upper_tri_ratio
+				branch:
+					val:0.600000
+					leaf:True
+				branch:
+					val:0.400000
+					leaf:False
+branch:
+	val:0.600000
+	subtree:
+		root:horizontal_change
+		branch:
+			val:0.900000
+			leaf:True
+		branch:
+			val:0.600000
+			subtree:
+				root:upper_tri_ratio
+				branch:
+					val:0.600000
+					subtree:
+						root:diag_ratio
+						branch:
+							val:0.000000
+							leaf:False
+						branch:
+							val:0.200000
+							leaf:False
+		branch:
+			val:0.400000
+			leaf:False
